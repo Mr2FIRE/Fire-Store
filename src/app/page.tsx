@@ -67,6 +67,16 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
       <div className="container mx-auto px-3 py-4 sm:py-8 mt-2 sm:mt-4">
+    {!wallet && (
+      <div className="max-w-xl mx-auto mt-20 text-center animate-fade-in">
+        <p className="text-lg sm:text-xl font-semibold text-white/90 bg-red-500/10 border border-red-500/30 rounded-xl p-6 leading-relaxed shadow-lg">
+          يجب عليك تسجيل الدخول أولا لتتمكن من عرض المتجر
+        </p>
+        <p className="mt-4 text-sm text-white/50">
+          اضغط زر تسجيل الدخول بالأعلى للمتابعة
+        </p>
+      </div>
+    )}
     {wallet && (
           <div className="max-w-4xl mx-auto">
       <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6 text-center">محفظتي</h2>
