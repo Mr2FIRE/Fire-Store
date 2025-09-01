@@ -7,7 +7,9 @@ import { isApprovedForAll } from "thirdweb/extensions/erc721";
 import { MARKETPLACE, NFT_COLLECTION } from "../../const/addresses";
 import AuctionListingButton from "./AuctionListingButton";
 import DirectListingButton from "./DirectListingButton";
-import cn from "classnames";
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
 import ApprovalButton from "./ApproveButton";
 
 type Props = {
