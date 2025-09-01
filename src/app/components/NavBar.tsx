@@ -9,6 +9,8 @@ import {
   useWalletBalance,
   ConnectButton,
 } from "thirdweb/react";
+import { inAppWallet, createWallet } from "thirdweb/wallets";
+import { POLYGON } from "../const/addresses";
 import { FIRE_CONTRACT } from "../const/addresses";
 import { useState } from "react";
 
@@ -103,12 +105,32 @@ export default function Navbar() {
             </div>
             <ConnectButton
               client={client}
+              chain={POLYGON}
+              wallets={[
+                inAppWallet({
+                  auth: {
+                    options: [
+                      "email",
+                      "telegram",
+                      "passkey",
+                      "phone",
+                      "google",
+                      "apple",
+                      "facebook",
+                    ],
+                  },
+                }),
+                createWallet("io.metamask"),
+                createWallet("com.coinbase.wallet"),
+                createWallet("walletConnect"),
+              ]}
               connectButton={{
                 label: (
-                  <span className="font-semibold text-sm sm:text-base text-white">
+                  <span className="font-semibold text-sm sm:text-base text-black">
                     {wallet ? "" : "تسجيل الدخول"}
                   </span>
                 ),
+                className: "bg-white hover:bg-white/90 border border-black/10 rounded-md px-4 py-2 transition shadow-sm",
               }}
             />
           </div>
