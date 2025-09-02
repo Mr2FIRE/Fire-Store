@@ -37,7 +37,7 @@ export default function Navbar() {
     { href: "/buy", label: "السوق", icon: (
       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
     ) },
-    { href: "/profile", label: "الملف", icon: (
+  { href: "/my-cards", label: "بطاقاتي", icon: (
       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c2-4 6-6 8-6s6 2 8 6"/></svg>
     ) },
   ];
