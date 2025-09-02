@@ -13,7 +13,7 @@ export const POLYGON = defineChain(137); // Polygon Mainnet
 // =========================
 // POLYGON TOKEN CONTRACTS (FIRE + USDT)
 // =========================
-export const FIRE_CONTRACT_ADDRESS = "0xAAbdBA3B8Da1B73496Fa97ddD5D17AC52eA3c9Ba"; // FIRE token on Polygon
+export const FIRE_CONTRACT_ADDRESS = "0xEB1818b86d91040f9a300b93a626500Eb54Af828"; // FIRE token on Polygon (updated)
 export const FIRE_CONTRACT = getContract({
   client,
   chain: POLYGON,
@@ -64,3 +64,9 @@ export const MARKETPLACE = getContract({
 // SCAN LINKS
 // =========================
 export const POLYGON_SCAN_URL = "https://polygonscan.com";
+
+// =========================
+// FIRE Dividend (Reflection) Distributor
+// =========================
+// Used to query pending USDT rewards for FIRE holders
+export const FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS = "0x832513fc4e418140B39D55d2614baDE823E1A589"; // updated distributor
