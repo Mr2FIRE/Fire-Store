@@ -1,6 +1,7 @@
 "use client";
+
 import { useState, useEffect } from "react";
-import { useActiveAccount, TransactionButton, useWalletBalance } from "thirdweb/react";
+import { useActiveAccount, TransactionButton } from "thirdweb/react";
 import { getContract, readContract, prepareContractCall } from "thirdweb";
 import { POLYGON, FIRE_CONTRACT_ADDRESS, USDT_CONTRACT_ADDRESS, CONVERSION_CONTRACT_ADDRESS } from "../const/addresses";
 import { client } from "../client";
@@ -237,9 +238,9 @@ export default function ConversionBox() {
         <p className="text-[10px] text-white/30 leading-relaxed pt-1">التحويل محصور بالأزواج المسموح بها فقط. سيتم لاحقاً إضافة أزواج أخرى بعد تحديث العقد.</p>
         {/* Gas Purchase Section */}
         <div className="mt-6 pt-5 border-t border-white/10 space-y-3">
-          <h4 className="text-sm font-semibold text-blue-300">شراء غاز (MATIC)</h4>
+          <h4 className="text-sm font-semibold text-blue-300">شراء عمولة (POL)</h4>
           <div>
-            <label className="text-[11px] text-white/50 mb-1 block">الكمية المطلوبة (MATIC)</label>
+            <label className="text-[11px] text-white/50 mb-1 block">الكمية المطلوبة (POL)</label>
             <input value={gasAmount} onChange={e=>setGasAmount(e.target.value.replace(/[^0-9.,]/g,''))} placeholder="0.05" className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
           </div>
           <div className="text-[11px] min-h-[18px]">
@@ -272,7 +273,7 @@ export default function ConversionBox() {
               className="w-full bg-gradient-to-r from-blue-500 via-cyan-500 to-emerald-500 hover:from-blue-400 hover:to-emerald-400 text-black font-semibold text-sm rounded-lg py-2"
             >شراء الغاز الآن</TransactionButton>
           )}
-          <p className="text-[10px] text-white/30 leading-relaxed">السعر يعتمد على قيمة maticPriceUsdt في العقد.</p>
+          <p className="text-[10px] text-white/30 leading-relaxed">السعر يعتمد على تسعيرة المطور, ستكون 0.1 كمية كافية لعدة معاملات</p>
         </div>
       </div>
     </div>
