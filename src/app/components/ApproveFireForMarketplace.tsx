@@ -88,7 +88,7 @@ export default function ApproveFireForMarketplace() {
             const contract = getContract({ client: FIRE_CONTRACT.client, chain: POLYGON, address: FIRE_CONTRACT.address, abi: ERC20_ABI as any });
             setTxBusy(true); setError(null);
             if (useFallbackApprove) {
-              return prepareContractCall({ contract, method: 'approve', params: [MARKETPLACE_ADDRESS, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')] });
+              return prepareContractCall({ contract, method: 'approve', params: [MARKETPLACE_ADDRESS, BigInt('100000000000')] });
             }
             return prepareContractCall({ contract, method: 'approveMax', params: [MARKETPLACE_ADDRESS] });
           }}
