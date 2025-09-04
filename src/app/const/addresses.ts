@@ -4,12 +4,10 @@ import { getContract } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 
 // =========================
-// CHAINS
+// CHAIN
 // =========================
-// Only Polygon now used
 export const POLYGON = defineChain(137); // Polygon Mainnet
 
-// =========================
 // =========================
 // POLYGON TOKEN CONTRACTS (FIRE + USDT)
 // =========================
@@ -70,3 +68,13 @@ export const POLYGON_SCAN_URL = "https://polygonscan.com";
 // =========================
 // Used to query pending USDT rewards for FIRE holders
 export const FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS = "0x832513fc4e418140B39D55d2614baDE823E1A589"; // updated distributor
+
+// =========================
+// Conversion Contract & Additional Tokens (placeholders for now)
+// =========================
+export const ZAIN_TOKEN_ADDRESS = "NA";
+export const MASTER_TOKEN_ADDRESS = "NA";
+export const FIB_TOKEN_ADDRESS = "NA";
+export const ASIA_TOKEN_ADDRESS = "NA";
+
+export const CONVERSION_CONTRACT_ADDRESS = "0x23E9b5fB75C35635ba0c522bC9292f0C9c529a6C"; // set after deployment
