@@ -9,6 +9,7 @@ import {
   useWalletBalance,
   TransactionButton,
 } from "thirdweb/react";
+import ConversionBox from "./components/ConversionBox";
 import { transfer } from "thirdweb/extensions/erc20";
 import {
   FIRE_CONTRACT,
@@ -63,6 +64,8 @@ export default function Home() {
     refetchUsdt();
   refetchFire();
   };
+
+  // History removed per requirements
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white">
@@ -146,6 +149,11 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Conversion */}
+            <div className="mb-14">
+              <ConversionBox />
             </div>
           </div>
         )}
