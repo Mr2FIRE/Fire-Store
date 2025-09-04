@@ -21,3 +21,9 @@
     @apply bg-zinc-950 text-neutral-200 m-0 p-0 w-full h-full;
   }
 }
+
+/* Force LTR only for connect button and its dropdown/popup */
+.connect-ltr, .connect-ltr * {
+  direction: ltr !important;
+  unicode-bidi: plaintext;
+}
