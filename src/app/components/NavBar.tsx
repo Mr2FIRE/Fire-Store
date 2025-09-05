@@ -12,7 +12,8 @@ import {
 import { inAppWallet, createWallet } from "thirdweb/wallets";
 import { POLYGON } from "../const/addresses";
 import { FIRE_CONTRACT } from "../const/addresses";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Flame, Layers } from "lucide-react";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -37,15 +38,36 @@ export default function Navbar() {
     { href: "/buy", label: "السوق", icon: (
       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
     ) },
-  { href: "/my-cards", label: "بطاقاتي", icon: (
-      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c2-4 6-6 8-6s6 2 8 6"/></svg>
-    ) },
+    { href: "/fire", label: "FIRE", icon: <Flame className="w-4 h-4" /> },
+    { href: "/my-cards", label: "بطاقاتي", icon: <Layers className="w-4 h-4" /> },
   ];
 
   const activeClass = (href: string) =>
     pathname === href
       ? "text-white bg-purple-600/60 shadow-inner"
       : "text-white/60 hover:text-white hover:bg-white/10";
+
+  // Force LTR specifically for thirdweb connect wallet popups rendered via portal
+  useEffect(() => {
+    const applyLTR = () => {
+      // Target typical dialog / portal roots
+      const dialogs = document.querySelectorAll('[role="dialog"], [data-overlay-root], .tw-connect-wallet, .tw-connected-wallet');
+      dialogs.forEach((el) => {
+        if (el instanceof HTMLElement) {
+          if (!el.dataset._ltrApplied) {
+            el.setAttribute('dir', 'ltr');
+            el.style.direction = 'ltr';
+            el.dataset._ltrApplied = '1';
+          }
+        }
+      });
+    };
+    applyLTR();
+    const obs = new MutationObserver(() => applyLTR());
+    obs.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('focus', applyLTR, true);
+    return () => { obs.disconnect(); window.removeEventListener('focus', applyLTR, true); };
+  }, []);
 
   return (
   <nav dir="ltr" className="sticky top-0 z-40 w-full backdrop-blur-md bg-black/55 border-b border-white/10 supports-[backdrop-filter]:bg-black/40">
@@ -103,6 +125,7 @@ export default function Navbar() {
                 </button>
               )}
             </div>
+            <div className="connect-ltr" dir="ltr">
             <ConnectButton
               client={client}
               chain={POLYGON}
@@ -133,6 +156,7 @@ export default function Navbar() {
                 className: "bg-white hover:bg-white/90 border border-black/10 rounded-md px-4 py-2 transition shadow-sm",
               }}
             />
+            </div>
           </div>
         </div>
 
