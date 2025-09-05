@@ -1,8 +1,5 @@
 "use client";
 
-// This page was formerly at /profile. It shows the user's owned cards and packs.
-// Renamed to /my-cards to free /profile for a future social profile page.
-
 import { useEffect, useState } from "react";
 import { useActiveWallet } from "thirdweb/react";
 import { getOwnedNFTs } from "thirdweb/extensions/erc1155";
@@ -18,6 +15,31 @@ import { motion, AnimatePresence } from "framer-motion";
 import { openPack } from "thirdweb/extensions/pack";
 import { useActiveAccount } from "thirdweb/react";
 import FireBox from "../components/FireBox";
+// Inline flame icon for reward modal (matches IntroLanding style)
+function RewardFlameIcon() {
+  return (
+    <svg viewBox="0 0 64 64" className="w-full h-full">
+      <defs>
+        <radialGradient id="rewardFlameGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#fff6e6" />
+          <stop offset="40%" stopColor="#ffb347" />
+          <stop offset="75%" stopColor="#ff6a00" />
+          <stop offset="100%" stopColor="#d23600" />
+        </radialGradient>
+        <linearGradient id="rewardFlameCore" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#ffe7c7" />
+          <stop offset="55%" stopColor="#ff9d2f" />
+          <stop offset="100%" stopColor="#ff4d00" />
+        </linearGradient>
+      </defs>
+      <path d="M34 4c2 6 0 9 4 13s6 5 8 10c5 11-1 25-14 25S15 49 16 37c1-12 11-15 9-25 3 2 5 6 5 10 1-5 2-9 4-13Z" fill="url(#rewardFlameGlow)" className="animate-[pulse_2.2s_ease-in-out_infinite]" opacity={0.9} />
+      <path d="M33 14c1 4-1 6 2 9 2 2 3 3 4 6 2 6-2 13-9 13s-10-7-8-13c1-6 6-7 5-13 2 1 4 4 4 6 0-3 1-5 2-8Z" fill="url(#rewardFlameCore)" className="animate-[pulse_1.4s_ease-in-out_infinite]" />
+      <circle cx="18" cy="18" r="2" fill="#ffa94d" className="animate-[ping_2.5s_linear_infinite]" />
+      <circle cx="46" cy="22" r="1.8" fill="#ffcf7a" className="animate-[ping_3s_linear_infinite]" />
+      <circle cx="30" cy="6" r="1.6" fill="#ffd9a3" className="animate-[ping_2.8s_linear_infinite]" />
+    </svg>
+  );
+}
 import DirectListingButton from "../components/SaleInfo/DirectListingButton";
 import ApprovalButton from "../components/SaleInfo/ApproveButton";
 import toast from "react-hot-toast";
@@ -151,7 +173,7 @@ export default function MyCardsPage() {
       gained.push({
         metadata: {
           name: "فاير",
-          image: "/assets/FireBox.png",
+          image: "__flame_svg__",
           description: "مكافأة فتح الصندوق",
           attributes: [],
         },
@@ -399,13 +421,17 @@ export default function MyCardsPage() {
                 {rewards.map((r: any, idx: number) => (
                   <div key={idx} className="bg-gray-800/70 rounded-lg p-3 border border-white/10 flex flex-col items-center text-center ${rewards.length === 1 ? 'w-40' : ''}">
                     <div className="relative w-full h-28 mb-3 overflow-hidden rounded-md bg-white/5">
-                      {r.metadata?.image && (
+                      {r.metadata?.image === "__flame_svg__" ? (
+                        <div className="flex items-center justify-center w-full h-full p-2">
+                          <RewardFlameIcon />
+                        </div>
+                      ) : r.metadata?.image ? (
                         <img
                           src={ipfsToHttp(r.metadata.image)}
                           alt={r.metadata.name}
                           className="w-full h-full object-cover"
                         />
-                      )}
+                      ) : null}
                     </div>
                     <div className="text-xs font-bold text-purple-300 truncate w-full" title={r.metadata?.name}>{r.metadata?.name || `#${r.id}`}</div>
                     <div className="text-[11px] text-white/70 mt-1">+{r.gained}</div>
