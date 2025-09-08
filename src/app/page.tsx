@@ -2,7 +2,7 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useActiveWallet,
   useActiveAccount,
@@ -10,12 +10,14 @@ import {
   TransactionButton,
 } from "thirdweb/react";
 import ConversionBox from "./components/ConversionBox";
+import TransactionInfo from "./components/TransactionInfo";
 import { transfer } from "thirdweb/extensions/erc20";
 import {
   FIRE_CONTRACT,
   USDT_CONTRACT,
   POLYGON,
   FIRE_TO_USDT_RATE,
+  getFIRE_TO_USDT_RATE,
 } from "@/app/const/addresses";
 import QRCode from "react-qr-code";
 import toast from "react-hot-toast";
@@ -50,15 +52,33 @@ export default function Home() {
       maximumFractionDigits: 6,
     });
 
+  // Live FIRE→USDT rate (fallback to exported const)
+  const [fireRate, setFireRate] = useState<number>(FIRE_TO_USDT_RATE);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const r = await getFIRE_TO_USDT_RATE();
+        if (mounted && typeof r === 'number' && isFinite(r)) setFireRate(r);
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
+
   const totalApproxUSDT =
-  Number(usdtBal?.displayValue || 0) +
-  Number(fireBal?.displayValue || 0) * FIRE_TO_USDT_RATE;
+    Number(usdtBal?.displayValue || 0) +
+    Number(fireBal?.displayValue || 0) * (fireRate || FIRE_TO_USDT_RATE);
 
   // ===== Modals state =====
   const [sendOpen, setSendOpen] = useState<false | TokenKey>(false);
   const [receiveOpen, setReceiveOpen] = useState<false | TokenKey>(false);
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
+  const [txInfoOpen, setTxInfoOpen] = useState(false);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
+  const [lastToken, setLastToken] = useState<TokenKey | null>(null);
+  const [lastTo, setLastTo] = useState<string | null>(null);
+  const [maxClickNonce, setMaxClickNonce] = useState(0);
 
   const refreshBalances = () => {
     refetchUsdt();
@@ -108,7 +128,13 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
               {/* USDT */}
               <div className="bg-gray-800 rounded-xl p-4 sm:p-5 shadow-lg">
-                <h4 className="font-semibold text-sm sm:text-base">USDT</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold text-sm sm:text-base">USDT</h4>
+                  <svg width="18" height="18" viewBox="0 0 256 256" aria-hidden>
+                    <circle cx="128" cy="128" r="128" fill="#26A17B" />
+                    <path fill="#fff" d="M71 78h114v22h-45v21c28 2 47 8 47 16 0 9-31 16-69 16s-69-7-69-16c0-7 19-13 47-16V100H71V78zm57 70c29 0 52-4 52-9s-23-9-52-9-52 4-52 9 23 9 52 9z" />
+                  </svg>
+                </div>
                 <p className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
                   {fmt(usdtBal?.displayValue)} يوس
                 </p>
@@ -130,7 +156,18 @@ export default function Home() {
 
               {/* FIRE */}
               <div className="bg-gray-800 rounded-xl p-4 sm:p-5 shadow-lg">
-                <h4 className="font-semibold text-sm sm:text-base">FIRE</h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold text-sm sm:text-base">FIRE</h4>
+                  <svg width="18" height="18" viewBox="0 0 64 64" aria-hidden>
+                    <defs>
+                      <linearGradient id="fi2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ffb347" />
+                        <stop offset="100%" stopColor="#ff4d00" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M34 4c2 6 0 9 4 13s6 5 8 10c5 11-1 25-14 25S15 49 16 37c1-12 11-15 9-25 3 2 5 6 5 10 1-5 2-9 4-13Z" fill="url(#fi2)" />
+                  </svg>
+                </div>
                 <p className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
                   {fmt(fireBal?.displayValue)} فاير
                 </p>
@@ -178,12 +215,24 @@ export default function Home() {
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               />
-              <input
-                className="w-full mb-3 rounded p-2 bg-gray-800 text-sm"
-                placeholder="Amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
+              <div className="w-full mb-3 flex items-center gap-2">
+                <input
+                  className="flex-1 rounded p-2 bg-gray-800 text-sm"
+                  placeholder="Amount"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <button
+                  onClick={() => {
+                    const val = (sendOpen === 'USDT' ? usdtBal?.displayValue : fireBal?.displayValue) || '0';
+                    setAmount(String(val));
+                    setMaxClickNonce((n) => n + 1);
+                  }}
+                  className="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-600 text-xs"
+                  type="button"
+                  aria-label="Max"
+                >Max</button>
+              </div>
 
               <TransactionButton
                 transaction={() =>
@@ -194,7 +243,10 @@ export default function Home() {
                     amount,
                   })
                 }
-                onTransactionSent={() => {
+                onTransactionSent={(ev: any) => {
+                  const txHash = ev?.transactionHash || ev?.hash || null;
+                  if (txHash) setLastTxHash(txHash);
+                  setLastTo(to);
                   toast.loading("...جاري الإرسال", {
                     id: "send-tx",
                     style: toastStyle,
@@ -209,18 +261,47 @@ export default function Home() {
                   });
                   setSendOpen(false);
                 }}
-                onTransactionConfirmed={() => {
+                onTransactionConfirmed={(ev: any) => {
+                  try {
+                    const hash = ev?.transactionHash || ev?.receipt?.transactionHash || lastTxHash;
+                    if (hash) setLastTxHash(hash);
+                  } catch {}
                   refreshBalances();
                   toast.success("تم الإرسال بنجاح", {
                     id: "send-tx",
                     style: toastStyle,
                     position: "bottom-center",
                   });
+                  setLastToken(sendOpen);
                   setSendOpen(false);
+                  setTxInfoOpen(true);
                 }}
               >
                 تأكيد الإرسال
               </TransactionButton>
+            </div>
+          </div>
+        )}
+
+        {/* TX INFO MODAL */}
+        {txInfoOpen && lastTxHash && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center px-3 z-50">
+      <div className="bg-gray-900 p-4 sm:p-6 rounded-xl w-full max-w-xl relative">
+              <button
+                onClick={() => setTxInfoOpen(false)}
+                aria-label="إغلاق معلومات المعاملة"
+        className="absolute -top-2 right-2 sm:top-2 sm:right-2 text-gray-400 hover:text-white transition"
+              >✕</button>
+              <h3 className="text-lg sm:text-xl font-semibold mb-4">تفاصيل المعاملة</h3>
+              <TransactionInfo
+                txHash={lastTxHash}
+                tokenAddress={lastToken === 'USDT' ? USDT_CONTRACT.address : lastToken === 'FIRE' ? FIRE_CONTRACT.address : undefined}
+        tokenDecimals={lastToken === 'USDT' ? 6 : lastToken === 'FIRE' ? 2 : 18}
+        tokenLabel={lastToken || undefined}
+        success
+                expectedFrom={address || undefined}
+                expectedTo={lastTo || undefined}
+              />
             </div>
           </div>
         )}
