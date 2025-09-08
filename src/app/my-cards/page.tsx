@@ -5,17 +5,17 @@ import { useActiveWallet } from "thirdweb/react";
 import { getOwnedNFTs } from "thirdweb/extensions/erc1155";
 import {
   CARD_CONTRACT_ADDRESS,
-  PACK_CONTRACT_ADDRESS,
+  PACK_ATTEMPTS,
+  PACK_ATTEMPTS_ADDRESS,
+  PACK_IDS,
   POLYGON,
 } from "../const/addresses";
-import { defineChain, getContract, sendTransaction } from "thirdweb";
+import { defineChain, getContract, sendTransaction, readContract, prepareContractCall } from "thirdweb";
 import Image from "next/image";
 import { client } from "../client";
 import { motion, AnimatePresence } from "framer-motion";
-import { openPack } from "thirdweb/extensions/pack";
 import { useActiveAccount } from "thirdweb/react";
 import FireBox from "../components/FireBox";
-// Inline flame icon for reward modal (matches IntroLanding style)
 function RewardFlameIcon() {
   return (
     <svg viewBox="0 0 64 64" className="w-full h-full">
@@ -62,6 +62,7 @@ type NFT = {
 export default function MyCardsPage() {
   const [nfts, setNfts] = useState<any[]>([]);
   const [packs, setPacks] = useState<any[]>([]);
+  const [attemptsMap, setAttemptsMap] = useState<Record<number, bigint>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNft, setSelectedNft] = useState<NFT | null>(null);
   const [activeTab, setActiveTab] = useState("NFTs");
@@ -82,11 +83,14 @@ export default function MyCardsPage() {
     client,
   });
 
-  const packsContract = getContract({
-    address: PACK_CONTRACT_ADDRESS,
-    chain,
-    client,
-  });
+  // New PackAttempts contract reference
+  const packAttempts = PACK_ATTEMPTS;
+
+  // Minimal ABI for attempts and open
+  const PACK_ABI = [
+    { type: "function", name: "attempts", stateMutability: "view", inputs: [ { name: "packId", type: "uint256" }, { name: "user", type: "address" } ], outputs: [ { name: "", type: "uint256" } ] },
+    { type: "function", name: "open", stateMutability: "nonpayable", inputs: [ { name: "packId", type: "uint256" } ], outputs: [] },
+  ] as const;
 
   useEffect(() => {
     if (walletAddress !== "0x") {
@@ -98,22 +102,31 @@ export default function MyCardsPage() {
     if (!walletAddress) return;
     try {
       setRefreshing(true);
-      const [fetchedNFTs, fetchedPacks] = await Promise.all([
-        getOwnedNFTs({
+      const fetchedNFTs = await getOwnedNFTs({
           contract: cardsContract,
             start: 0,
             count: 50,
             address: walletAddress,
-          }),
-        getOwnedNFTs({
-          contract: packsContract,
-          start: 0,
-          count: 50,
-          address: walletAddress,
-        }),
-      ]);
+          });
+      // Load attempts for configured pack IDs
+      const attEntries: [number, bigint][] = await Promise.all(
+        PACK_IDS.map(async (id) => {
+          try {
+            const value = await readContract({
+              contract: getContract({ client, chain, address: PACK_ATTEMPTS_ADDRESS, abi: PACK_ABI as any }),
+              method: "attempts",
+              params: [BigInt(id), walletAddress],
+            }) as unknown as bigint;
+            return [id, value];
+          } catch {
+            return [id, 0n];
+          }
+        })
+      );
+      const next: Record<number, bigint> = {};
+      for (const [id, val] of attEntries) next[id] = val;
+      setAttemptsMap(next);
       setNfts(fetchedNFTs);
-      setPacks(fetchedPacks);
       toast.success("تم التحديث", { style: toastStyle, position: "bottom-center" });
     } catch (e) {
       toast.error("فشل التحديث", { style: toastStyle, position: "bottom-center" });
@@ -135,66 +148,80 @@ export default function MyCardsPage() {
       }
       setOpeningPack(true);
       toast.loading("...فتح الصندوق", { id: "open-pack", style: toastStyle, position: "bottom-center" });
+      const currentAttempts = attemptsMap[packId] || 0n;
+      if (currentAttempts === 0n) {
+        toast.error("لا توجد محاولات متاحة", { id: 'open-pack', style: toastStyle, position: 'bottom-center' });
+        setOpeningPack(false);
+        return;
+      }
 
-      const baseline: Record<string, bigint> = {};
-      nfts.forEach((n: any) => {
-        const id = (n.id ?? n.tokenId ?? "").toString();
-        baseline[id] = BigInt(n.quantityOwned?.toString?.() || n.amount?.toString?.() || "0");
-      });
+  let gasOverride: bigint | undefined;
+  const GWEI = 1_000_000_000n;
+  let maxPriorityFeePerGas: bigint = 26n * GWEI;  // 26 gwei tip (>= 25 min)
+  let maxFeePerGas: bigint = 50n * GWEI;          // 50 gwei cap
+      try {
+        const txForEstimate = await prepareContractCall({
+          contract: getContract({ client, chain, address: PACK_ATTEMPTS_ADDRESS, abi: PACK_ABI as any }),
+          method: 'open',
+          params: [BigInt(packId)],
+        });
+        if (account?.estimateGas) {
+            const est = await account.estimateGas(txForEstimate);
+            if (typeof est === 'bigint') {
+              gasOverride = (est * 130n) / 100n; // +30% buffer
+            }
+        }
+      } catch (e) {
+        console.warn('[PackOpen] Gas estimation failed, using fallback', e);
+      }
+      if (!gasOverride) {
+        gasOverride = 1_000_000n;
+      }
+      if (maxPriorityFeePerGas > maxFeePerGas) {
+        maxFeePerGas = maxPriorityFeePerGas + 5n * GWEI;
+      }
+      try {
+  const gweiNum = Number(maxFeePerGas / GWEI); 
+        const gasNum = Number(gasOverride);
+        const capPOL = (gweiNum * gasNum) / 1_000_000_000;
+        toast.dismiss('open-pack');
+  toast.loading(`إرسال المعاملة... (سقف أقصى ≈ ${capPOL.toFixed(3)} POL، التكلفة الفعلية غالباً أقل)`, { id: 'open-pack', style: toastStyle, position: 'bottom-center' });
+      } catch {}
 
-      const transaction = await openPack({
-        contract: packsContract,
-        packId: BigInt(packId),
-        amountToOpen: BigInt(1),
-        overrides: {},
-      });
+      const transaction = await prepareContractCall({
+        contract: getContract({ client, chain, address: PACK_ATTEMPTS_ADDRESS, abi: PACK_ABI as any }),
+        method: 'open',
+        params: [BigInt(packId)],
+        gas: gasOverride,
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+      } as any);
 
       await sendTransaction({ transaction, account });
-
-      await new Promise((res) => setTimeout(res, 1500));
-      const latestNFTs = await getOwnedNFTs({
-        contract: cardsContract,
-        start: 0,
-        count: 100,
-        address: walletAddress,
-      });
-      setNfts(latestNFTs);
-
-      const gained = latestNFTs
-        .map((n: any) => {
-          const id = (n.id ?? n.tokenId ?? "").toString();
-          const prev = baseline[id] || BigInt(0);
-          const now = BigInt(n.quantityOwned?.toString?.() || n.amount?.toString?.() || "0");
-          if (now > prev) return { ...n, gained: (now - prev).toString() };
-          return null;
-        })
-        .filter(Boolean) as any[];
-
-      gained.push({
-        metadata: {
-          name: "فاير",
-          image: "__flame_svg__",
-          description: "مكافأة فتح الصندوق",
-          attributes: [],
-        },
-        id: "fire",
-        gained: "1",
-      });
-
-      setRewards(gained);
+      setAttemptsMap((prev) => ({ ...prev, [packId]: (prev[packId] || 0n) - 1n }));
+      try {
+        await new Promise((res) => setTimeout(res, 1200));
+        const latestNFTs = await getOwnedNFTs({ contract: cardsContract, start: 0, count: 100, address: walletAddress });
+        setNfts(latestNFTs);
+      } catch {}
+      setRewards([
+        { metadata: { name: 'مكافأة', image: '__flame_svg__', description: 'تم استلام مكافأة من الصندوق', attributes: [] }, id: 'reward', gained: '1' }
+      ]);
       setShowRewards(true);
       toast.success("تم استلام المكافآت", { id: "open-pack", style: toastStyle, position: "bottom-center" });
-
-      const latestPacks = await getOwnedNFTs({
-        contract: packsContract,
-        start: 0,
-        count: 50,
-        address: walletAddress,
-      });
-      setPacks(latestPacks);
-    } catch (e) {
-      console.error(e);
-      toast.error("فشل فتح الصندوق", { id: "open-pack", style: toastStyle, position: "bottom-center" });
+    } catch (e: any) {
+      console.error('[PackOpen] failed', e);
+      const msg: string = e?.message || '';
+      let friendly = 'فشل فتح الصندوق';
+      if (/insufficient funds|out of gas|intrinsic gas/i.test(msg)) {
+        friendly = 'فشل بسبب الغاز: تحقق من الرصيد أو ارفع حد الغاز';
+      } else if (/revert/i.test(msg)) {
+        const m = /revert(?:ed)?\s?[:]?\s?(.*)/i.exec(msg);
+        if (m && m[1]) friendly = 'فشل: ' + m[1];
+      }
+      // Append raw snippet (trim) for debugging
+      const snippet = msg.replace(/\n/g,' ').slice(0,140);
+      toast.error(friendly + (snippet ? `\n[${snippet}]` : ''), { id: 'open-pack', style: toastStyle, position: 'bottom-center', duration: 7000 });
     } finally {
       setOpeningPack(false);
     }
@@ -208,7 +235,7 @@ export default function MyCardsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white px-4 py-8 flex flex-col items-center w-full">
-      <h1 className="text-2xl font-bold mb-6 text-purple-400 font-medieval">My Cards</h1>
+      <h1 className="text-2xl font-bold mb-6 text-purple-400 font-medieval">بطاقاتي</h1>
       <div className="flex space-x-4 mb-6 items-center">
         <button
           onClick={() => setActiveTab("NFTs")}
@@ -287,10 +314,10 @@ export default function MyCardsPage() {
         </div>
       ))}
 
-      {activeTab === "Packs" && (
+  {activeTab === "Packs" && (
         <div className="w-full flex justify-center">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-7xl px-4">
-            {packs.map((pack, index) => (
+    {PACK_IDS.map((pid, index) => (
               <motion.div
                 key={index}
                 className="bg-gray-800 rounded-lg flex flex-col items-center justify-start p-4 border border-white/10 hover:border-purple-600 transition"
@@ -299,15 +326,14 @@ export default function MyCardsPage() {
               >
                 <FireBox />
                 <div className="mt-4 w-full text-center text-white">
-                  <h2 className="text-xl font-medieval mb-2">{pack.metadata.name}</h2>
-                  <p className="text-sm mb-2 font-medieval">{pack.metadata.description}</p>
-                  <p className="text-sm mb-2 font-medieval">لديك : {pack.quantityOwned.toString()} صندوق</p>
+      <h2 className="text-xl font-medieval mb-2">صندوق #{pid}</h2>
+      <p className="text-sm mb-2 font-medieval">محاولاتك: { (attemptsMap[pid] || 0n).toString() }</p>
                   <button
-                    onClick={() => openNewPack(pack.id)}
-                    disabled={openingPack}
+        onClick={() => openNewPack(pid)}
+        disabled={openingPack || (attemptsMap[pid] || 0n) === 0n}
                     className="w-full bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white font-bold py-2 px-4 rounded transition duration-200 font-medieval mt-2"
                   >
-                    {openingPack ? "..." : "فتح الصندوق"}
+        {openingPack ? "..." : "فتح"}
                   </button>
                 </div>
               </motion.div>
