@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 import Navbar from "./components/NavBar";
 import IntroLanding from "./components/IntroLanding";
 import BottomNav from "./components/BottomNav";
+import Script from "next/script";
 
 
 const inter = Inter({ subsets: ["latin"] });
@@ -23,6 +24,15 @@ export default function RootLayout({
 }) {
   return (
   <html lang="ar" dir="rtl">
+      <head>
+        {/* Google AdSense - async script included on every page */}
+        <Script
+          id="adsense-script"
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2211206432268473"
+          strategy="afterInteractive"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body className={inter.className}>
   <ThirdwebProvider>
   <Navbar />
