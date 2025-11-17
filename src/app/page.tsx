@@ -131,8 +131,12 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <h4 className="font-semibold text-sm sm:text-base">USDT</h4>
                   <svg width="18" height="18" viewBox="0 0 256 256" aria-hidden>
-                    <circle cx="128" cy="128" r="128" fill="#26A17B" />
-                    <path fill="#fff" d="M71 78h114v22h-45v21c28 2 47 8 47 16 0 9-31 16-69 16s-69-7-69-16c0-7 19-13 47-16V100H71V78zm57 70c29 0 52-4 52-9s-23-9-52-9-52 4-52 9 23 9 52 9z" />
+                    <circle cx="128" cy="128" r="128" fill="#50AF95" />
+                    <g fill="#fff">
+                      <rect x="56" y="60" width="144" height="28" rx="5" />
+                      <rect x="116" y="88" width="24" height="74" rx="5" />
+                    </g>
+                    <ellipse cx="128" cy="134" rx="86" ry="22" fill="none" stroke="#fff" strokeWidth="16" />
                   </svg>
                 </div>
                 <p className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">
