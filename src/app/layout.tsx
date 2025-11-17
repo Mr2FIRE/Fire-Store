@@ -7,6 +7,7 @@ import Navbar from "./components/NavBar";
 import IntroLanding from "./components/IntroLanding";
 import BottomNav from "./components/BottomNav";
 import Script from "next/script";
+import AdSlot from "./components/ads";
 
 
 const inter = Inter({ subsets: ["latin"] });
@@ -37,6 +38,8 @@ export default function RootLayout({
   <ThirdwebProvider>
   <Navbar />
   <IntroLanding />
+    {/* Top banner ad (replace adSlot with your production slot id) */}
+    <AdSlot adSlot="REPLACE_TOP_SLOT_ID" className="my-4 px-4" />
     <main className="pb-20">{children}</main>
   <BottomNav />
   {/* Global toast portal */}
