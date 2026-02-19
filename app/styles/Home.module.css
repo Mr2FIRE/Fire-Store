@@ -1,0 +1,180 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 2rem;
+  border-top: 1px solid #333;
+  position: fixed;
+  bottom: 20px;
+  left: 0;
+  right: 0;
+  background: #1a1c22;
+}
+.navIcon {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 64px;
+  cursor: pointer;
+}
+.navIconLabel {
+  font-size: 14px;
+  text-align: center;
+  color: rgb(224, 224, 224);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  background-image: linear-gradient(90deg, rgb(87, 53, 211), rgb(52, 123, 190));
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient 3s ease infinite;
+}
+
+.spacer {
+  height: 8rem;
+}
+
+.profileWrapper {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+  color: white;
+}
+
+.profileHeading {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.card {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.05);
+}
+
+.nftGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.nftCard {
+  background-color: rgba(255, 255, 255, 0.05);
+  padding: 0.75rem;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nftImage {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.nftDetails {
+  margin-top: 0.5rem;
+}
+
+.amount {
+  display: inline-block;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  margin-top: 0.25rem;
+}
+
+.web3ButtonWrapper {
+  text-align: center;
+  margin-top: 2rem;
+}
+
+.wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  perspective: 1000px;
+  margin-top: 50px;
+}
+
+.firebox {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  animation: shakeBox 0.7s infinite;
+  transform-style: preserve-3d;
+  transform: rotateX(20deg) rotateY(-15deg);
+}
+
+.body {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #ff512f, #dd2476);
+  border: 4px solid #fff;
+  border-radius: 16px;
+  box-shadow: 0 15px 30px rgba(255, 90, 0, 0.4);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.lid {
+  position: absolute;
+  top: -20px;
+  left: -10px;
+  width: 140px;
+  height: 30px;
+  background: #ff652f;
+  border-radius: 10px;
+  transform: rotateX(25deg);
+  box-shadow: 0 5px 15px rgba(255, 90, 0, 0.5);
+  z-index: 2;
+}
+
+.glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.3), transparent 70%);
+  border-radius: 16px;
+  animation: pulse 2s infinite;
+  z-index: 0;
+}
+
+@keyframes shakeBox {
+  0% { transform: rotateX(20deg) rotateY(-15deg) translateX(0); }
+  25% { transform: rotateX(20deg) rotateY(-15deg) translateX(-3px); }
+  50% { transform: rotateX(20deg) rotateY(-15deg) translateX(3px); }
+  75% { transform: rotateX(20deg) rotateY(-15deg) translateX(-2px); }
+  100% { transform: rotateX(20deg) rotateY(-15deg) translateX(0); }
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

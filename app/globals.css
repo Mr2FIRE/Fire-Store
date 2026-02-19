@@ -1,0 +1,37 @@
+/* globals.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-style: normal;
+  font-variation-settings: "slnt" 0;
+}
+
+@layer base {
+  /* Theme-aware body backgrounds. ThemeProvider toggles a class on <html>. */
+  html.theme-dark body {
+    @apply bg-gradient-to-br from-gray-900 to-black text-white m-0 p-0 w-full h-full;
+  }
+  html.theme-light body {
+    @apply bg-white text-black m-0 p-0 w-full h-full;
+  }
+  /* Fallback (no theme set) */
+  body {
+    @apply bg-zinc-950 text-neutral-200 m-0 p-0 w-full h-full;
+  }
+}
+
+/* Force LTR only for connect button and its dropdown/popup */
+.connect-ltr, .connect-ltr * {
+  direction: ltr !important;
+  unicode-bidi: plaintext;
+}
