@@ -113,7 +113,7 @@ export default function IntroLanding() {
             {/* Feature grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-[11px] sm:text-xs">
               {[{
-                title: 'سرعة', desc: 'تنفيذ سريع على Polygon'
+                title: 'سرعة', desc: 'تنفيذ سريع على BSC Testnet'
               },{
                 title: 'أمان', desc: 'عقود ذكية موثوقة'
               },{

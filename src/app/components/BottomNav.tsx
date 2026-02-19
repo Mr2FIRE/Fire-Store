@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wallet, Store, UserCircle, Layers, Flame } from "lucide-react";
+import { Wallet, Store, ArrowLeftRight, Layers, Flame } from "lucide-react";
 
 type NavLink = {
   href: string;
@@ -15,7 +15,7 @@ const links: NavLink[] = [
   { href: "/buy", label: "السوق", icon: Store },
   { href: "/fire", label: "FIRE", icon: Flame },
   { href: "/my-cards", label: "بطاقاتي", icon: Layers },
-  { href: "#", label: "الملف", icon: UserCircle, comingSoon: true },
+  { href: "/p2p", label: "P2P", icon: ArrowLeftRight },
 ];
 
 export default function BottomNav() {

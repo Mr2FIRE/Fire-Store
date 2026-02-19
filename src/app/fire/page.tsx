@@ -2,23 +2,17 @@
 import { useEffect, useState } from "react";
 import { useActiveAccount, useWalletBalance, TransactionButton } from "thirdweb/react";
 import { getContract, readContract, prepareContractCall } from "thirdweb";
-import { FIRE_CONTRACT, POLYGON, FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS } from "../const/addresses";
+import { FIRE_CONTRACT, BSC_TESTNET, FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS, MARKETPLACE_ADDRESS, FIRE_CONTRACT_ADDRESS } from "../const/addresses";
+import ApproveForStore from "../components/ApproveForStore";
 import toast from "react-hot-toast";
 import toastStyle from "../util/toastConfig";
 
-// Precise ABI fragments from provided contract for reading & claiming
+// Unified distributor ABI (USDTRewardsDistributor)
 const DISTRIBUTOR_ABI: any[] = [
-  { type: "function", name: "getUnpaidEarnings", stateMutability: "view", inputs: [{ name: "shareholder", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
-  { type: "function", name: "claimDividend", stateMutability: "nonpayable", inputs: [], outputs: [] },
-  { type: "function", name: "shares", stateMutability: "view", inputs: [{ name: "", type: "address" }], outputs: [
-      { name: "amount", type: "uint256" },
-      { name: "totalExcluded", type: "uint256" },
-      { name: "totalRealised", type: "uint256" }
-    ] },
-  { type: "function", name: "totalDividends", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
-  { type: "function", name: "totalDistributed", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
-  { type: "function", name: "totalShares", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
-  { type: "function", name: "dividendsPerShare", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "withdrawableOf", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "accumulativeOf", stateMutability: "view", inputs: [{ name: "account", type: "address" }], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [], outputs: [] },
+  { type: "function", name: "pointsPerShare", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "uint256" }] },
 ];
 
 function formatAmount(raw: bigint, decimals: number) {
@@ -29,19 +23,26 @@ function formatAmount(raw: bigint, decimals: number) {
   return fracStr ? `${whole}.${fracStr}` : whole.toString();
 }
 
+function formatBigDecimals(raw: bigint, decimals: number, maxFrac = 4) {
+  const s = formatAmount(raw, decimals);
+  if (!s.includes('.')) return s;
+  const [w, f] = s.split('.');
+  return `${w}.${f.slice(0, maxFrac)}`;
+}
+
 export default function FireTokenPage() {
   const account = useActiveAccount();
   const address = account?.address;
   const { data: fireBal, refetch: refetchFire } = useWalletBalance({
     client: FIRE_CONTRACT.client,
-    chain: POLYGON,
+    chain: BSC_TESTNET,
     address,
     tokenAddress: FIRE_CONTRACT.address,
   });
 
   const [pendingRaw, setPendingRaw] = useState<bigint | null>(null);
   const [realisedRaw, setRealisedRaw] = useState<bigint | null>(null);
-  const [stats, setStats] = useState<{ totalDividends?: bigint; totalDistributed?: bigint; totalShares?: bigint; shareAmount?: bigint } | null>(null);
+  const [stats, setStats] = useState<{ pointsPerShare?: bigint } | null>(null);
   const [loadingRewards, setLoadingRewards] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,23 +52,16 @@ export default function FireTokenPage() {
     if (!address) { setPendingRaw(null); setRealisedRaw(null); return; }
     setLoadingRewards(true); setError(null);
     try {
-      const contract = getContract({ client: FIRE_CONTRACT.client, chain: POLYGON, address: FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS, abi: DISTRIBUTOR_ABI });
-      const [pending, shareTuple, totalDividends, totalDistributed, totalShares] = await Promise.all([
-        readContract({ contract, method: "getUnpaidEarnings", params: [address] }) as Promise<bigint>,
-        readContract({ contract, method: "shares", params: [address] }) as Promise<any>,
-        readContract({ contract, method: "totalDividends", params: [] }) as Promise<bigint>,
-        readContract({ contract, method: "totalDistributed", params: [] }) as Promise<bigint>,
-        readContract({ contract, method: "totalShares", params: [] }) as Promise<bigint>,
+      const contract = getContract({ client: FIRE_CONTRACT.client, chain: BSC_TESTNET, address: FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS, abi: DISTRIBUTOR_ABI });
+      const [pending, realised, pointsShare] = await Promise.all([
+        readContract({ contract, method: "withdrawableOf", params: [address] }) as Promise<bigint>,
+        readContract({ contract, method: "accumulativeOf", params: [address] }) as Promise<bigint>,
+        readContract({ contract, method: "pointsPerShare", params: [] }) as Promise<bigint>,
       ]);
       setPendingRaw(pending);
-      let shareAmount: bigint | undefined;
-      if (Array.isArray(shareTuple)) {
-        shareAmount = shareTuple[0] as bigint;
-        setRealisedRaw(shareTuple[2] as bigint);
-      } else if (shareTuple && typeof shareTuple === 'object' && 'totalRealised' in shareTuple) {
-        setRealisedRaw(shareTuple.totalRealised as bigint);
-      }
-      setStats({ totalDividends, totalDistributed, totalShares, shareAmount });
+      // do not fetch requiredFire here; fee details are shown when sending (ConversionBox)
+      setRealisedRaw(realised);
+      setStats({ pointsPerShare: pointsShare });
     } catch (e:any) {
       setError(e.message || 'فشل جلب بيانات المكافآت');
       setPendingRaw(null); setRealisedRaw(null); setStats(null);
@@ -77,8 +71,8 @@ export default function FireTokenPage() {
   useEffect(() => { loadRewards(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [address]);
 
   const fireDisplay = fireBal?.displayValue ? Number(fireBal.displayValue).toLocaleString('en-US', { maximumFractionDigits: 6 }) : '0';
-  const pendingDisplay = pendingRaw !== null ? formatAmount(pendingRaw, 6) : '0';
-  const realisedDisplay = realisedRaw !== null ? formatAmount(realisedRaw, 6) : '0';
+  const pendingDisplay = pendingRaw !== null ? formatBigDecimals(pendingRaw, 6, 3) : '0';
+  const realisedDisplay = realisedRaw !== null ? formatBigDecimals(realisedRaw, 6, 3) : '0';
 
   // Decorative animated background sparks
   const Sparks = () => (
@@ -132,6 +126,10 @@ export default function FireTokenPage() {
           <p className="text-white/60 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">هذه الصفحة تعرض رصيدك الحالي من عملة فاير بالإضافة إلى مكافآت الانعكاس (رسوم فاير) التي تُوزع لك بعملة USDT.</p>
         </header>
 
+        <ApproveForStore tokenAddress={FIRE_CONTRACT_ADDRESS} spenderAddress={MARKETPLACE_ADDRESS} tokenLabel="فاير" />
+
+          {/* Ads removed */}
+
         {!address && (
           <div className="text-center py-24 text-white/50">سجل الدخول لعرض بيانات فاير</div>
         )}
@@ -157,7 +155,7 @@ export default function FireTokenPage() {
               <div className="relative bg-white/5 border border-white/10 rounded-2xl p-6 overflow-hidden">
                 <div className="absolute -top-24 -right-24 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl" />
                 <div className="relative">
-                  <h2 className="text-sm font-semibold mb-3 text-purple-300">مكافآت USDT المعلقة</h2>
+                  <h2 className="text-sm font-semibold mb-3 text-purple-300">مكافآت USDT القابلة للسحب</h2>
                   <div className="text-3xl sm:text-4xl font-extrabold tracking-wide text-green-300 drop-shadow-[0_0_10px_rgba(0,255,180,0.25)]">{pendingDisplay}<span className="text-sm ml-1 text-white/40 font-normal">USDT</span></div>
                   <p className="text-[11px] mt-2 text-white/40">المبلغ القابل للسحب الآن</p>
                   {error && <p className="text-[11px] mt-3 text-red-400">{error}</p>}
@@ -166,8 +164,8 @@ export default function FireTokenPage() {
                     <TransactionButton
                       transaction={() => {
                         setClaiming(true);
-                        const contract = getContract({ client: FIRE_CONTRACT.client, chain: POLYGON, address: FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS, abi: DISTRIBUTOR_ABI });
-                        return prepareContractCall({ contract, method: "claimDividend", params: [] });
+                        const contract = getContract({ client: FIRE_CONTRACT.client, chain: BSC_TESTNET, address: FIRE_DIVIDEND_DISTRIBUTOR_ADDRESS, abi: DISTRIBUTOR_ABI });
+                        return prepareContractCall({ contract, method: "claim", params: [] });
                       }}
                       disabled={!pendingRaw || pendingRaw === 0n || claiming}
                       onTransactionSent={() => toast.loading("...جارٍ المطالبة", { id: "claim-div", style: toastStyle, position: "bottom-center" })}
@@ -192,20 +190,8 @@ export default function FireTokenPage() {
                       <p className="font-bold text-white/90 mt-0.5">{realisedDisplay}<span className="ml-0.5 text-[10px] text-white/40">USDT</span></p>
                     </div>
                     <div>
-                      <p className="text-white/50">إجمالي الموزع</p>
-                      <p className="font-bold text-white/90 mt-0.5">{stats?.totalDistributed ? formatAmount(stats.totalDistributed, 6) : '0'}<span className="ml-0.5 text-[10px] text-white/40">USDT</span></p>
-                    </div>
-                    <div>
-                      <p className="text-white/50">إجمالي الأرباح</p>
-                      <p className="font-bold text-white/90 mt-0.5">{stats?.totalDividends ? formatAmount(stats.totalDividends, 6) : '0'}<span className="ml-0.5 text-[10px] text-white/40">USDT</span></p>
-                    </div>
-                    <div>
-                      <p className="text-white/50">إجمالي الحصص</p>
-                      <p className="font-bold text-white/90 mt-0.5">{stats?.totalShares ? Number(stats.totalShares).toLocaleString() : '0'}</p>
-                    </div>
-                    <div>
-                      <p className="text-white/50">حصتك المسجلة</p>
-                      <p className="font-bold text-white/90 mt-0.5">{stats?.shareAmount ? Number(stats.shareAmount).toLocaleString() : '0'}</p>
+                      <p className="text-white/50">نقاط/حصة</p>
+                      <p className="font-bold text-white/90 mt-0.5">{stats?.pointsPerShare ? (stats.pointsPerShare > 1000000000000000000n ? formatBigDecimals(stats.pointsPerShare / 1000000000000000000n, 0, 2) + 'e18' : formatBigDecimals(stats.pointsPerShare, 18, 2)) : '0'}</p>
                     </div>
                   </div>
                   <p className="text-[10px] text-white/30 leading-relaxed">قيم تقريبية تعتمد على قراءة عقد الموزع. قد لا تُحدَّث فورياً حتى تنفذ عملية المعالجة الدورية.</p>

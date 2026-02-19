@@ -3,6 +3,10 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
+import { getContract, readContract } from "thirdweb";
+import { CONVERSION_CONTRACT_ADDRESS, FIRE_CONTRACT_ADDRESS, USDT_CONTRACT_ADDRESS } from "./const/addresses";
+import { client } from "./client";
+import { ethers } from "ethers";
 import {
   useActiveWallet,
   useActiveAccount,
@@ -15,7 +19,7 @@ import { transfer } from "thirdweb/extensions/erc20";
 import {
   FIRE_CONTRACT,
   USDT_CONTRACT,
-  POLYGON,
+  BSC_TESTNET,
   FIRE_TO_USDT_RATE,
   getFIRE_TO_USDT_RATE,
 } from "@/app/const/addresses";
@@ -31,17 +35,17 @@ export default function Home() {
   const address = account?.address;
 
 
-  // ===== Balances (Polygon tokens) =====
+  // ===== Balances (BSC Testnet tokens) =====
   const { data: usdtBal, refetch: refetchUsdt } = useWalletBalance({
     client: USDT_CONTRACT.client,
-    chain: POLYGON,
+    chain: BSC_TESTNET,
     address,
     tokenAddress: USDT_CONTRACT.address,
   });
 
   const { data: fireBal, refetch: refetchFire } = useWalletBalance({
     client: FIRE_CONTRACT.client,
-    chain: POLYGON,
+    chain: BSC_TESTNET,
     address,
     tokenAddress: FIRE_CONTRACT.address,
   });
@@ -65,9 +69,14 @@ export default function Home() {
     return () => { mounted = false; };
   }, []);
 
+  const safeNumber = (v?: string | number) => {
+    const n = v === undefined || v === null ? 0 : Number(String(v).replace(/,/g, ""));
+    return Number.isFinite(n) ? n : 0;
+  };
+
   const totalApproxUSDT =
-    Number(usdtBal?.displayValue || 0) +
-    Number(fireBal?.displayValue || 0) * (fireRate || FIRE_TO_USDT_RATE);
+    safeNumber(usdtBal?.displayValue) +
+    safeNumber(fireBal?.displayValue) * (typeof fireRate === 'number' && isFinite(fireRate) ? fireRate : FIRE_TO_USDT_RATE);
 
   // ===== Modals state =====
   const [sendOpen, setSendOpen] = useState<false | TokenKey>(false);
@@ -84,6 +93,73 @@ export default function Home() {
     refetchUsdt();
   refetchFire();
   };
+
+  // estimate fees when user enters send details
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        setEstimatingFees(false);
+        setFeeDev(null); setFeeMarketing(null); setFeeHolders(null); setFeeNet(null); setNetworkFeeMatic(null);
+        if (!sendOpen || sendOpen !== "FIRE") return;
+        if (!amount || !account?.address) return;
+        setEstimatingFees(true);
+        // call unified contract helper getFeeBreakdownFor
+        const ABI = [{ type: "function", name: "getFeeBreakdownFor", stateMutability: "view", inputs: [{ name: "sender", type: "address" }, { name: "amount", type: "uint256" }], outputs: [{ name: "devFee", type: "uint256" }, { name: "marketingFee", type: "uint256" }, { name: "holdersFee", type: "uint256" }, { name: "net", type: "uint256" }] }];
+        const conv = getContract({ client, chain: BSC_TESTNET, address: CONVERSION_CONTRACT_ADDRESS, abi: ABI as any });
+        const amtUnits = parseInput(amount, 2); // FIRE decimals = 2
+        try {
+          const res = await readContract({ contract: conv, method: "getFeeBreakdownFor", params: [account?.address, amtUnits] }) as any;
+          if (!ignore && res) {
+            setFeeDev(BigInt(res[0] || 0));
+            setFeeMarketing(BigInt(res[1] || 0));
+            setFeeHolders(BigInt(res[2] || 0));
+            setFeeNet(BigInt(res[3] || 0));
+          }
+        } catch (e) {
+          // ignore if not available
+        }
+
+        // estimate network fee (approx) using provider gas price * gas limit
+        try {
+          if ((window as any).ethereum) {
+            const provider = new ethers.providers.Web3Provider((window as any).ethereum as any);
+            const gasPrice = await provider.getGasPrice();
+            const gasLimit = ethers.BigNumber.from(100000);
+            const feeWei = gasPrice.mul(gasLimit);
+            const feeMatic = ethers.utils.formatEther(feeWei);
+            if (!ignore) setNetworkFeeMatic(feeMatic);
+          }
+        } catch (e) { /* ignore */ }
+      } catch (e) {
+        console.warn("fee estimate failed", e);
+      } finally {
+        if (!ignore) setEstimatingFees(false);
+      }
+    })();
+    return () => { ignore = true; };
+  }, [amount, sendOpen, account?.address]);
+
+    // Fee estimate states (for send modal)
+    const [feeDev, setFeeDev] = useState<bigint | null>(null);
+    const [feeMarketing, setFeeMarketing] = useState<bigint | null>(null);
+    const [feeHolders, setFeeHolders] = useState<bigint | null>(null);
+    const [feeNet, setFeeNet] = useState<bigint | null>(null);
+    const [networkFeeMatic, setNetworkFeeMatic] = useState<string | null>(null);
+    const [estimatingFees, setEstimatingFees] = useState(false);
+
+    function parseInput(v: string, dec: number) {
+      if (!v) return 0n;
+      const [intP, fracP = ""] = v.replace(/,/g, "").split(".");
+      const frac = fracP.slice(0, dec).padEnd(dec, "0");
+      return BigInt(intP || "0") * 10n ** BigInt(dec) + BigInt(frac || "0");
+    }
+    function formatRaw(raw: bigint, dec: number) {
+      const whole = raw / 10n ** BigInt(dec);
+      const frac = raw % 10n ** BigInt(dec);
+      if (frac === 0n) return whole.toString();
+      return `${whole}.${frac.toString().padStart(dec, "0").slice(0, 6).replace(/0+$/, "")}`;
+    }
 
   // History removed per requirements
 
@@ -114,7 +190,7 @@ export default function Home() {
                   aria-label="تحديث الأرصدة"
                 >↻</button>
                 <span className="text-sm text-gray-400 bg-purple-900/30 px-3 py-1 rounded-full">
-                  Polygon
+                  BSC Testnet (97)
                 </span>
               </div>
               <div className="text-2xl sm:text-4xl font-bold mb-1 sm:mb-2">
@@ -238,15 +314,37 @@ export default function Home() {
                 >Max</button>
               </div>
 
+              {/* Fee estimate (Arabic) - only for FIRE sends */}
+              {sendOpen === 'FIRE' && (
+                <div className="text-[13px] mb-3 text-white/70 space-y-1">
+                  {estimatingFees && <div className="text-white/40">...حساب الرسوم</div>}
+                  {!estimatingFees && (
+                    <>
+                      <div>رسوم الشبكة (تقريبي): <span className="text-white/90">{networkFeeMatic ? `${networkFeeMatic} BNB` : '—'}</span></div>
+                      <div>إجمالي رسوم التوكن: <span className="text-white/90">{(feeDev !== null && feeMarketing !== null && feeHolders !== null) ? `${formatRaw((feeDev||0n) + (feeMarketing||0n) + (feeHolders||0n), 2)} FIRE` : '—'}</span></div>
+                      <div>سيتم الإرسال: <span className="text-white/90">{amount || '0'} FIRE</span></div>
+                      <div>سيستلم المستلم: <span className="text-white/90">{feeNet !== null ? `${formatRaw(feeNet, 2)} FIRE` : '—'}</span></div>
+                    </>
+                  )}
+                </div>
+              )}
+
               <TransactionButton
-                transaction={() =>
-                  transfer({
-                    contract:
-                      sendOpen === "USDT" ? USDT_CONTRACT : FIRE_CONTRACT,
+                transaction={() => {
+                  // Validate inputs before preparing transaction so we can show clear errors
+                  if (!to || !ethers.utils.isAddress(to)) {
+                    throw new Error("Invalid recipient address");
+                  }
+                  if (!amount || Number(amount) <= 0) {
+                    throw new Error("Invalid amount");
+                  }
+                  // thirdweb `transfer` expects a human-readable `amount` (string/number)
+                  return transfer({
+                    contract: sendOpen === "USDT" ? USDT_CONTRACT : FIRE_CONTRACT,
                     to,
                     amount,
-                  })
-                }
+                  });
+                }}
                 onTransactionSent={(ev: any) => {
                   const txHash = ev?.transactionHash || ev?.hash || null;
                   if (txHash) setLastTxHash(txHash);
@@ -329,7 +427,7 @@ export default function Home() {
               </div>
               <p className="mt-2 break-all text-xs sm:text-sm text-white/70 px-2">{address}</p>
               <p className="mt-3 text-[11px] sm:text-xs text-orange-300 font-medium bg-orange-500/10 inline-block px-3 py-1 rounded-md border border-orange-400/30">
-                الشبكة: بوليجون (Polygon)
+                الشبكة: BSC Testnet (97)
               </p>
             </div>
           </div>

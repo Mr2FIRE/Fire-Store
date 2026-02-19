@@ -4,9 +4,10 @@ import { useActiveAccount, TransactionButton } from "thirdweb/react";
 import { FIRE_CONTRACT, MARKETPLACE_ADDRESS } from "../const/addresses";
 import { readContract, prepareContractCall } from "thirdweb";
 import { getContract } from "thirdweb";
-import { POLYGON } from "../const/addresses";
+import { BSC_TESTNET } from "../const/addresses";
 import toast from "react-hot-toast";
 import toastStyle from "../util/toastConfig";
+import { useTheme } from "../providers/ThemeProvider";
 
 const ERC20_ABI = [
   { type: "function", name: "allowance", stateMutability: "view", inputs: [
@@ -21,10 +22,10 @@ const ERC20_ABI = [
     ], outputs: [{ name: "", type: "bool" }] }
 ];
 
-// Removed persistent localStorage gating; always verify on-chain each session
 
 export default function ApproveFireForMarketplace() {
   const account = useActiveAccount();
+  const { theme } = useTheme();
   const [needsApproval, setNeedsApproval] = useState(false);
   const [checking, setChecking] = useState(true);
   const [allowanceValue, setAllowanceValue] = useState<bigint | null>(null);
@@ -39,8 +40,8 @@ export default function ApproveFireForMarketplace() {
       if (!account?.address) { setChecking(false); setAllowanceValue(null); return; }
       try {
         setError(null);
-        const contract = getContract({ client: FIRE_CONTRACT.client, chain: POLYGON, address: FIRE_CONTRACT.address, abi: ERC20_ABI as any });
-        const allowance: bigint = await readContract({ contract, method: "allowance", params: [account.address, MARKETPLACE_ADDRESS] }) as unknown as bigint;
+        const contract = getContract({ client: FIRE_CONTRACT.client, chain: BSC_TESTNET, address: FIRE_CONTRACT.address, abi: ERC20_ABI as any });
+        const allowance: bigint = await readContract({ contract, method: "allowance", params: [account?.address, MARKETPLACE_ADDRESS] }) as unknown as bigint;
         if (!ignore) {
           setAllowanceValue(allowance);
           setNeedsApproval(allowance === 0n);
@@ -64,7 +65,7 @@ export default function ApproveFireForMarketplace() {
   // Show a slim bar while checking
   if (checking) {
     return (
-      <div className="mb-6 max-w-2xl mx-auto text-center text-white/50 text-sm animate-pulse">
+      <div className={`mb-6 max-w-2xl mx-auto text-center ${theme === 'light' ? 'text-gray-600' : 'text-white/50'} text-sm animate-pulse`}>
         ...فحص سماح المتجر
       </div>
     );
@@ -77,7 +78,7 @@ export default function ApproveFireForMarketplace() {
         يجب توثيق المتجر للسماح له باستخدام رصيد FIRE (مرة واحدة فقط)
       </p>
       {allowanceValue !== null && (
-        <p className="text-[11px] text-white/40 mb-2">القيمة الحالية للسماح: {allowanceValue.toString()}</p>
+        <p className={`text-[11px] mb-2 ${theme === 'light' ? 'text-gray-600' : 'text-white/40'}`}>القيمة الحالية للسماح: {allowanceValue.toString()}</p>
       )}
       {error && (
         <p className="text-[11px] text-red-400 mb-2 break-all">خطأ الفحص: {error}</p>
@@ -85,7 +86,7 @@ export default function ApproveFireForMarketplace() {
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <TransactionButton
           transaction={() => {
-            const contract = getContract({ client: FIRE_CONTRACT.client, chain: POLYGON, address: FIRE_CONTRACT.address, abi: ERC20_ABI as any });
+            const contract = getContract({ client: FIRE_CONTRACT.client, chain: BSC_TESTNET, address: FIRE_CONTRACT.address, abi: ERC20_ABI as any });
             setTxBusy(true); setError(null);
             if (useFallbackApprove) {
               return prepareContractCall({ contract, method: 'approve', params: [MARKETPLACE_ADDRESS, BigInt('100000000000')] });
@@ -107,7 +108,7 @@ export default function ApproveFireForMarketplace() {
         >{useFallbackApprove ? 'توثيق (approve)' : 'توثيق المتجر'}</TransactionButton>
         <button
           onClick={() => { setChecking(true); setNeedsApproval(false); setError(null); setAllowanceValue(null); setRecheckKey(k => k + 1); }}
-          className="w-full sm:w-auto px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-semibold border border-white/15"
+          className={theme === 'light' ? 'w-full sm:w-auto px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-black text-sm font-semibold border border-gray-200' : 'w-full sm:w-auto px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-sm font-semibold border border-white/15'}
           disabled={txBusy}
         >إعادة الفحص</button>
         {!useFallbackApprove && error && (
@@ -121,3 +122,4 @@ export default function ApproveFireForMarketplace() {
     </div>
   );
 }
+  

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { POLYGON } from "../const/addresses";
+import { BSC_TESTNET } from "../const/addresses";
 
 type Props = {
   txHash: string;
@@ -76,7 +76,7 @@ async function rpcCall<T>(rpcUrl: string, method: string, params: any[]): Promis
   return json.result as T;
 }
 
-export default function TransactionInfo({ txHash, chainId = POLYGON.id, tokenAddress, tokenDecimals = 18, rpcUrl, tokenLabel, success = true, expectedFrom, expectedTo }: Props) {
+export default function TransactionInfo({ txHash, chainId = BSC_TESTNET.id, tokenAddress, tokenDecimals = 18, rpcUrl, tokenLabel, success = true, expectedFrom, expectedTo }: Props) {
   const [tx, setTx] = useState<Tx | null>(null);
   const [rc, setRc] = useState<Receipt | null>(null);
   const [blk, setBlk] = useState<Block | null>(null);
@@ -85,8 +85,9 @@ export default function TransactionInfo({ txHash, chainId = POLYGON.id, tokenAdd
 
   const url = useMemo(() => {
     if (rpcUrl) return rpcUrl;
-    if (chainId === 137) return "https://polygon-rpc.com";
-    return "https://polygon-rpc.com";
+    // BSC Testnet RPC
+    if (chainId === BSC_TESTNET.id) return "https://rpc.ankr.com/bsc_testnet";
+    return "https://rpc.ankr.com/bsc_testnet";
   }, [rpcUrl, chainId]);
 
   const tokenKind = (tokenLabel || (tokenAddress ? "TOKEN" : "POL")).toUpperCase();
@@ -107,8 +108,15 @@ export default function TransactionInfo({ txHash, chainId = POLYGON.id, tokenAdd
     if (tokenKind === "USDT") {
       return (
         <svg width={size} height={size} viewBox="0 0 256 256" aria-hidden>
-          <circle cx="128" cy="128" r="128" fill="#26A17B" />
-          <path fill="#fff" d="M71 78h114v22h-45v21c28 2 47 8 47 16 0 9-31 16-69 16s-69-7-69-16c0-7 19-13 47-16V100H71V78zm57 70c29 0 52-4 52-9s-23-9-52-9-52 4-52 9 23 9 52 9z" />
+          <circle cx="128" cy="128" r="128" fill="#50AF95" />
+          <g fill="#fff">
+            {/* Top bar of the T */}
+            <rect x="56" y="60" width="144" height="28" rx="6" />
+            {/* Vertical stem of the T */}
+            <rect x="116" y="88" width="24" height="74" rx="6" />
+          </g>
+          {/* Central ellipse ring */}
+          <ellipse cx="128" cy="134" rx="86" ry="22" fill="none" stroke="#fff" strokeWidth="18" />
         </svg>
       );
     }
@@ -240,7 +248,7 @@ export default function TransactionInfo({ txHash, chainId = POLYGON.id, tokenAdd
     const lbl = (tokenLabel || (tokenAddress ? "FIRE" : "POL")).toUpperCase();
     if (lbl === "FIRE") return "فاير";
     if (lbl === "USDT") return "يوس";
-  if (lbl === "POL" || lbl === "MATIC") return "POL";
+  if (lbl === "POL" || lbl === "MATIC") return "BNB";
     return lbl;
   })();
 
@@ -279,7 +287,7 @@ export default function TransactionInfo({ txHash, chainId = POLYGON.id, tokenAdd
           <div className="flex items-center gap-2 text-base">
             <span className="text-white/70">عمولة الشبكة:</span>
             <span className="text-white font-semibold">{gasStr}</span>
-            <span className="text-white/80">POL</span>
+            <span className="text-white/80">BNB</span>
           </div>
           <div className="flex items-center gap-2 text-base">
             <span className="text-white/70">الوقت والتاريخ:</span>

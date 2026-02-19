@@ -5,17 +5,20 @@ import { useActiveWallet } from "thirdweb/react";
 import { getOwnedNFTs } from "thirdweb/extensions/erc1155";
 import {
   CARD_CONTRACT_ADDRESS,
+  FIRE_CONTRACT_ADDRESS,
   PACK_ATTEMPTS,
   PACK_ATTEMPTS_ADDRESS,
   PACK_IDS,
-  POLYGON,
+  BSC_TESTNET,
 } from "../const/addresses";
-import { defineChain, getContract, sendTransaction, readContract, prepareContractCall } from "thirdweb";
+import { defineChain, getContract, readContract, prepareContractCall } from "thirdweb";
+import { safeSendTransaction } from "../util/safeSend";
 import Image from "next/image";
 import { client } from "../client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useActiveAccount } from "thirdweb/react";
 import FireBox from "../components/FireBox";
+import ApproveForStore from "../components/ApproveForStore";
 function RewardFlameIcon() {
   return (
     <svg viewBox="0 0 64 64" className="w-full h-full">
@@ -73,7 +76,7 @@ export default function MyCardsPage() {
   const [showRewards, setShowRewards] = useState(false);
 
   const walletInfo = useActiveWallet();
-  const chain = defineChain(walletInfo?.getChain()?.id ?? POLYGON.id);
+  const chain = defineChain(walletInfo?.getChain()?.id ?? BSC_TESTNET.id);
   const walletAddress = walletInfo?.getAccount()?.address ?? "0x";
   const account = useActiveAccount();
 
@@ -185,7 +188,7 @@ export default function MyCardsPage() {
         const gasNum = Number(gasOverride);
         const capPOL = (gweiNum * gasNum) / 1_000_000_000;
         toast.dismiss('open-pack');
-  toast.loading(`إرسال المعاملة... (سقف أقصى ≈ ${capPOL.toFixed(3)} POL، التكلفة الفعلية غالباً أقل)`, { id: 'open-pack', style: toastStyle, position: 'bottom-center' });
+  toast.loading(`إرسال المعاملة... (سقف أقصى ≈ ${capPOL.toFixed(3)} BNB، التكلفة الفعلية غالباً أقل)`, { id: 'open-pack', style: toastStyle, position: 'bottom-center' });
       } catch {}
 
       const transaction = await prepareContractCall({
@@ -197,7 +200,7 @@ export default function MyCardsPage() {
         maxPriorityFeePerGas,
       } as any);
 
-      await sendTransaction({ transaction, account });
+      await safeSendTransaction({ transaction, account });
       setAttemptsMap((prev) => ({ ...prev, [packId]: (prev[packId] || 0n) - 1n }));
       try {
         await new Promise((res) => setTimeout(res, 1200));
@@ -236,6 +239,7 @@ export default function MyCardsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white px-4 py-8 flex flex-col items-center w-full">
       <h1 className="text-2xl font-bold mb-6 text-purple-400 font-medieval">بطاقاتي</h1>
+      <ApproveForStore tokenAddress={FIRE_CONTRACT_ADDRESS} spenderAddress={PACK_ATTEMPTS_ADDRESS} tokenLabel="فاير" />
       <div className="flex space-x-4 mb-6 items-center">
         <button
           onClick={() => setActiveTab("NFTs")}

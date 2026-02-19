@@ -10,10 +10,11 @@ import {
   ConnectButton,
 } from "thirdweb/react";
 import { inAppWallet, createWallet } from "thirdweb/wallets";
-import { POLYGON } from "../const/addresses";
+import { BSC_TESTNET } from "../const/addresses";
 import { FIRE_CONTRACT } from "../const/addresses";
 import { useState, useEffect } from "react";
-import { Flame, Layers } from "lucide-react";
+import { Flame, Layers, ArrowLeftRight, Sun, Moon } from "lucide-react";
+import { useTheme } from "../providers/ThemeProvider";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -30,6 +31,7 @@ export default function Navbar() {
     ? `${address.slice(0, 4)}...${address.slice(-4)}`
     : "";
   const [open, setOpen] = useState(false);
+  const { theme, toggle } = useTheme();
 
   const links = [
     { href: "/", label: "محفظتي", icon: (
@@ -40,6 +42,7 @@ export default function Navbar() {
     ) },
     { href: "/fire", label: "FIRE", icon: <Flame className="w-4 h-4" /> },
     { href: "/my-cards", label: "بطاقاتي", icon: <Layers className="w-4 h-4" /> },
+    { href: "/p2p", label: "P2P", icon: <ArrowLeftRight className="w-4 h-4" /> },
   ];
 
   const activeClass = (href: string) =>
@@ -62,6 +65,7 @@ export default function Navbar() {
         }
       });
     };
+    // Run immediately in case already open
     applyLTR();
     const obs = new MutationObserver(() => applyLTR());
     obs.observe(document.body, { childList: true, subtree: true });
@@ -128,7 +132,7 @@ export default function Navbar() {
             <div className="connect-ltr" dir="ltr">
             <ConnectButton
               client={client}
-              chain={POLYGON}
+              chain={BSC_TESTNET}
               wallets={[
                 inAppWallet({
                   auth: {
@@ -149,13 +153,25 @@ export default function Navbar() {
               ]}
               connectButton={{
                 label: (
-                  <span className="font-semibold text-sm sm:text-base text-black">
+                  <span className={`font-semibold text-sm sm:text-base ${theme === 'light' ? 'text-black' : 'text-white'}`}>
                     {wallet ? "" : "تسجيل الدخول"}
                   </span>
                 ),
-                className: "bg-white hover:bg-white/90 border border-black/10 rounded-md px-4 py-2 transition shadow-sm",
+                className: theme === 'light'
+                  ? 'bg-white text-black hover:bg-white/90 border border-black/10 rounded-md px-4 py-2 transition shadow-sm'
+                  : 'bg-black text-white hover:bg-black/90 border border-white/10 rounded-md px-4 py-2 transition shadow-sm',
               }}
             />
+            </div>
+            {/* Theme toggle placed after connect button to be visible globally */}
+            <div>
+              <button
+                onClick={() => toggle()}
+                title="Toggle theme"
+                className={theme === 'light' ? 'p-2 rounded bg-white border border-black/10 text-black' : 'p-2 rounded bg-white/5 hover:bg-white/10 text-white'}
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
             </div>
           </div>
         </div>

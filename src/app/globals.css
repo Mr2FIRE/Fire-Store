@@ -17,6 +17,14 @@
 }
 
 @layer base {
+  /* Theme-aware body backgrounds. ThemeProvider toggles a class on <html>. */
+  html.theme-dark body {
+    @apply bg-gradient-to-br from-gray-900 to-black text-white m-0 p-0 w-full h-full;
+  }
+  html.theme-light body {
+    @apply bg-white text-black m-0 p-0 w-full h-full;
+  }
+  /* Fallback (no theme set) */
   body {
     @apply bg-zinc-950 text-neutral-200 m-0 p-0 w-full h-full;
   }

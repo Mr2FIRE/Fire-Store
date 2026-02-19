@@ -3,7 +3,8 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getNFT } from "thirdweb/extensions/erc1155";
 import { getAllValidListings, getAllValidAuctions, buyFromListing } from "thirdweb/extensions/marketplace";
-import { MARKETPLACE, NFT_COLLECTION, FIRE_CONTRACT_ADDRESS } from "@/app/const/addresses";
+import { MARKETPLACE, NFT_COLLECTION, FIRE_CONTRACT_ADDRESS, MARKETPLACE_ADDRESS, BSC_TESTNET } from "@/app/const/addresses";
+import { readContract, prepareContractCall, getContract } from "thirdweb";
 import { MediaRenderer } from "thirdweb/react";
 import { client } from "@/app/client";
 import { TransactionButton, useActiveAccount } from "thirdweb/react";
@@ -22,6 +23,36 @@ export default function TokenPage() {
   const [auction, setAuction] = useState<any>(null);
   const [quantity, setQuantity] = useState("1");
   const [loading, setLoading] = useState(true);
+  const [checkingAllowance, setCheckingAllowance] = useState(false);
+  const [hasAllowance, setHasAllowance] = useState<undefined | boolean>(undefined); // undefined = not yet checked
+  // Removed localStorage caching so each connected wallet triggers a fresh on-chain allowance check
+  const [lastApproveError, setLastApproveError] = useState<string | null>(null);
+  const [useFallbackApprove, setUseFallbackApprove] = useState(false);
+  const [lastBuyError, setLastBuyError] = useState<string | null>(null);
+
+  // Minimal ABI for allowance + custom approveMax
+  const ERC20_ABI = [
+    { type: "function", name: "allowance", stateMutability: "view", inputs: [
+      { name: "owner", type: "address" }, { name: "spender", type: "address" }
+    ], outputs: [{ name: "", type: "uint256" }] },
+  { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [ { name: "spender", type: "address" }, { name: "amount", type: "uint256" } ], outputs: [{ name: "", type: "bool" }] },
+    { type: "function", name: "approveMax", stateMutability: "nonpayable", inputs: [ { name: "spender", type: "address" } ], outputs: [{ name: "", type: "bool" }] }
+  ] as const;
+
+  async function checkAllowance(address?: string) {
+    if (!address) return;
+    try {
+      setCheckingAllowance(true);
+      const contract = getContract({ client, chain: BSC_TESTNET, address: FIRE_CONTRACT_ADDRESS, abi: ERC20_ABI as any });
+      const allowance = await readContract({ contract, method: "allowance", params: [address, MARKETPLACE_ADDRESS] }) as unknown as bigint;
+      setHasAllowance(allowance > 0n);
+    } catch (e) {
+      console.warn("Allowance check failed", e);
+      setHasAllowance(false); // force approval flow
+    } finally {
+      setCheckingAllowance(false);
+    }
+  }
 
   useEffect(() => {
     if (!tokenId) return;
@@ -43,11 +74,19 @@ export default function TokenPage() {
     })();
   }, [tokenId]);
 
+  // Check allowance when account or listing changes
+  useEffect(() => {
+    if (account?.address && listing) {
+      checkAllowance(account?.address);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.address, listing?.id]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black text-white px-4 py-6 sm:py-10">
       <div className="max-w-5xl mx-auto">
         <div className="mb-4 text-sm text-white/60 flex items-center gap-2">
-          <Link href="/" className="hover:underline">الرئيسية</Link>
+          <Link href="/buy" className="hover:underline">السوق</Link>
           <span>/</span>
           <span>السلعة</span>
         </div>
@@ -105,28 +144,84 @@ export default function TokenPage() {
                     max={Number(listing.quantity)}
                     className="w-full mb-3 px-2 py-1.5 rounded-md bg-gray-900 border border-white/10 focus:outline-none focus:border-purple-600 text-sm"
                   />
-                  <TransactionButton
-                    transaction={() => {
-                      return buyFromListing({
-                        contract: MARKETPLACE,
-                        listingId: listing.id,
-                        quantity: BigInt(quantity || "1"),
-                        recipient: account?.address!,
-                      });
-                    }}
-                    disabled={!account}
-                    onTransactionSent={() =>
-                      toast.loading("...جاري الشراء", { id: "buy", style: toastStyle, position: "bottom-center" })
-                    }
-                    onError={() =>
-                      toast.error("فشل الشراء", { id: "buy", style: toastStyle, position: "bottom-center" })
-                    }
-                    onTransactionConfirmed={() =>
-                      toast.success("تم الشراء", { id: "buy", style: toastStyle, position: "bottom-center" })
-                    }
-                  >
-                    شراء الآن
-                  </TransactionButton>
+                  {!account && (
+                    <div className="text-center text-white/50 text-sm py-2">سجل الدخول أولاً</div>
+                  )}
+                  {account && hasAllowance === undefined && (
+                    <div className="text-center text-white/50 text-sm py-2">...فحص السماح</div>
+                  )}
+                  {account && (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <TransactionButton
+                          transaction={() => {
+                            if (hasAllowance !== true) {
+                              throw new Error("NO_ALLOWANCE");
+                            }
+                            return buyFromListing({
+                              contract: MARKETPLACE,
+                              listingId: listing.id,
+                              quantity: BigInt(quantity || "1"),
+                              recipient: account?.address!,
+                            });
+                          }}
+                          disabled={hasAllowance !== true}
+                          onTransactionSent={() =>
+                            toast.loading("...جاري الشراء", { id: "buy", style: toastStyle, position: "bottom-center" })
+                          }
+                          onError={(e) => {
+                            if ((e as any)?.message?.includes("NO_ALLOWANCE")) return; // handled by disabled state
+                            const msg = (e as any)?.shortMessage || (e as any)?.message || "فشل الشراء";
+                            setLastBuyError(msg);
+                            toast.error("فشل الشراء", { id: "buy", style: toastStyle, position: "bottom-center" });
+                          }}
+                          onTransactionConfirmed={() =>
+                            toast.success("تم الشراء", { id: "buy", style: toastStyle, position: "bottom-center" })
+                          }
+                          className="flex-1"
+                        >
+                          شراء الآن
+                        </TransactionButton>
+                        {hasAllowance === false && (
+                          <TransactionButton
+                            transaction={() => {
+                              const contract = getContract({ client, chain: BSC_TESTNET, address: FIRE_CONTRACT_ADDRESS, abi: ERC20_ABI as any });
+                              setLastApproveError(null);
+                              return prepareContractCall({ contract, method: useFallbackApprove ? "approve" : "approveMax", params: useFallbackApprove ? [MARKETPLACE_ADDRESS, BigInt("100000000000")] : [MARKETPLACE_ADDRESS] });
+                            }}
+                            onTransactionSent={() => toast.loading("...جاري التوثيق", { id: "approve", style: toastStyle, position: "bottom-center" })}
+                            onError={(e) => {
+                              const msg = (e as any)?.shortMessage || (e as any)?.message || "فشل التوثيق";
+                              setLastApproveError(msg);
+                              toast.error("فشل التوثيق", { id: "approve", style: toastStyle, position: "bottom-center" });
+                            }}
+                            onTransactionConfirmed={async () => {
+                              toast.success("تم التوثيق", { id: "approve", style: toastStyle, position: "bottom-center" });
+                              await checkAllowance(account?.address);
+                            }}
+                            className="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-bold"
+                          >
+                            توثيق المتجر
+                          </TransactionButton>
+                        )}
+                      </div>
+                      {hasAllowance === false && (
+                        <div className="text-[11px] text-white/60 text-center sm:text-right">
+                          التوثيق مطلوب مرة واحدة فقط ثم يمكنك الشراء مباشرة
+                          {lastApproveError && (
+                            <div className="mt-1 text-red-400 break-all">
+                              فشل التوثيق: {lastApproveError} <button className="underline" onClick={() => setUseFallbackApprove(true)}>استخدام approve العادية</button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {lastBuyError && (
+                    <div className="mt-3 text-xs text-red-400 break-all bg-red-500/10 border border-red-500/30 rounded p-2">
+                      تفاصيل الخطأ: {lastBuyError}
+                    </div>
+                  )}
                 </div>
               )}
               {auction && !listing && (
@@ -146,6 +241,7 @@ export default function TokenPage() {
           <div className="text-center text-white/60 py-20">لم يتم العثور على NFT</div>
         )}
       </div>
+  {/* Modal removed: approval now inline next to buy button */}
     </div>
   );
 }
